@@ -124,6 +124,52 @@ def receive_message(node: Node) -> None:
 
             print(f"Received: uuid={message.uuid}, flag={message.flag}")
 
+            # Process recieved message
+            process_message(node, message)
+
+
+# Function for determining whether to forward or ignore UUID and finally determining a leader
+def process_message(node: Node, message: Message) -> None:
+    # Check if leader has not been found yet
+    if message.flag == 0:
+        # Received UUID > Process UUID
+        if message.uuid > node.uuid:
+            print(f"Message's UUID is greater than Process's UUID")
+            # Forward message
+            send_message(node, message)
+
+        # Received UUID < Process UUID
+        elif message.uuid < node.uuid:
+            print(
+                f"Received message is ignored. Message's UUID is less than Process's UUID"
+            )
+
+        # Received UUID == Process UUID
+        else:
+            print(f"Message's UUID is equal to Process's UUID")
+
+            # This process is the leader
+            node.flag = 1
+            node.leader_id = node.uuid
+
+            # Tell other nodes the leader's UUID
+            leader_msg = Message(node.leader_id, 1)
+            send_message(node, leader_msg)
+
+            print(f"Leader found: {message.uuid}")
+
+    # Leader has been found
+    else:
+        if message.uuid == node.uuid:
+            print(f"Leader: {node.leader_id}")
+            return
+
+        # Process learns leader and forwards
+        node.flag = 1
+        node.leader_id = message.uuid
+        print(f"Leader: {node.leader_id}")
+        send_message(node, message)
+
 
 # Main Function
 def main():
