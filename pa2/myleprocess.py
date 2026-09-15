@@ -39,7 +39,7 @@ def server(node: Node) -> None:
         # Allows port to be reused instantly
         server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        # Bind server ip and server port to socker, then listen
+        # Bind server ip and server port to socket, then listen
         server_sock.bind((node.server_ip, node.server_port))
         server_sock.listen(1)
 
@@ -208,6 +208,7 @@ def process_message(node: Node, message: Message) -> bool:
         )
 
         send_message(node, message)
+        write_log(f"Leader is {node.leader_id}")
         return True
 
 
