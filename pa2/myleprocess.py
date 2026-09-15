@@ -7,8 +7,8 @@ import json
 
 # Message Class
 class Message:
-    def __init__(self, uuid: uuid.UUID, flag: int = 0):
-        self.uuid: uuid.UUID = uuid
+    def __init__(self, message_uuid: uuid.UUID, flag: int = 0):
+        self.uuid: uuid.UUID = message_uuid
         self.flag: int = flag
 
 
