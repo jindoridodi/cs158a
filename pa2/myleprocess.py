@@ -44,11 +44,11 @@ def server(node: Node) -> None:
         server_sock.listen(1)
 
         # Print to terminal
-        print(f"Server is on. IP and Port:{node.server_ip}:{node.server_port}")
+        write_log(f"Server is on. IP and Port:{node.server_ip}:{node.server_port}")
 
         # Accept connection from neighbor and print to terminal
         node.server_connection, addr = server_sock.accept()
-        print(f"Accepted connection from {addr}")
+        write_log(f"Accepted connection from {addr}")
 
 
 # Client
@@ -60,11 +60,15 @@ def client(node: Node) -> None:
             node.client_socket.connect((node.neighbor_ip, node.neighbor_port))
             break
         except OSError:
+            # Close any exising socket
+            if node.client_socket is not None:
+                node.client_socket.close()
+            node.client_socket = None
             # Sleep if cannot connect
             time.sleep(1)
 
     # Print status to terminal
-    print(f"Connected to neighbor {node.neighbor_ip}:{node.neighbor_port}")
+    write_log(f"Connected to neighbor {node.neighbor_ip}:{node.neighbor_port}")
 
 
 # Helper function to convert to JSON
@@ -78,6 +82,16 @@ def convert_to_message(data: str) -> Message:
     return Message(uuid.UUID(msg["uuid"]), msg["flag"])
 
 
+# Helper function for logs
+def write_log(log: str) -> None:
+    # Print log to terminal
+    print(log)
+
+    # Write log to txt
+    with open("log.txt", "a") as log_file:
+        log_file.write(log + "\n")
+
+
 # Send Message
 def send_message(node: Node, message: Message) -> None:
     # Ensure client socket is not None
@@ -88,7 +102,7 @@ def send_message(node: Node, message: Message) -> None:
     msg_data = convert_to_json(message)
     node.client_socket.sendall(msg_data.encode())
 
-    print(f"Sent: uuid={message.uuid}, flag={message.flag}")
+    write_log(f"Sent: uuid={message.uuid}, flag={message.flag}")
 
 
 # Receive Message
@@ -122,31 +136,38 @@ def receive_message(node: Node) -> None:
             # Convert JSON str to Message
             message = convert_to_message(msg_data)
 
-            print(f"Received: uuid={message.uuid}, flag={message.flag}")
+            write_log(f"Received: uuid={message.uuid}, flag={message.flag}")
 
             # Process recieved message
-            process_message(node, message)
+            leader_found = process_message(node, message)
+
+            # Exit once leader has been found
+            if leader_found:
+                return
 
 
 # Function for determining whether to forward or ignore UUID and finally determining a leader
-def process_message(node: Node, message: Message) -> None:
+# Returns boolean whether leader has been found or not
+def process_message(node: Node, message: Message) -> bool:
     # Check if leader has not been found yet
     if message.flag == 0:
         # Received UUID > Process UUID
         if message.uuid > node.uuid:
-            print(f"Message's UUID is greater than Process's UUID")
+            write_log(f"Message's UUID is greater than Process's UUID")
             # Forward message
             send_message(node, message)
+            return False
 
         # Received UUID < Process UUID
         elif message.uuid < node.uuid:
-            print(
+            write_log(
                 f"Received message is ignored. Message's UUID is less than Process's UUID"
             )
+            return False
 
         # Received UUID == Process UUID
         else:
-            print(f"Message's UUID is equal to Process's UUID")
+            write_log(f"Message's UUID is equal to Process's UUID")
 
             # This process is the leader
             node.flag = 1
@@ -156,19 +177,21 @@ def process_message(node: Node, message: Message) -> None:
             leader_msg = Message(node.leader_id, 1)
             send_message(node, leader_msg)
 
-            print(f"Leader found: {message.uuid}")
+            write_log(f"Leader found: {message.uuid}")
+            return False
 
     # Leader has been found
     else:
         if message.uuid == node.uuid:
-            print(f"Leader: {node.leader_id}")
-            return
+            write_log(f"Leader: {node.leader_id}")
+            return True
 
         # Process learns leader and forwards
         node.flag = 1
         node.leader_id = message.uuid
-        print(f"Leader: {node.leader_id}")
+        write_log(f"Leader: {node.leader_id}")
         send_message(node, message)
+        return True
 
 
 # Main Function
@@ -193,7 +216,7 @@ def main():
     # Log and print to terminal
     with open("log.txt", "w") as log:
         log.write(f"UUID: {node.uuid}\n")
-    print(f"UUID: {node.uuid}\n")
+    write_log(f"UUID: {node.uuid}\n")
 
     # Create threads
     server_thread = threading.Thread(target=server, args=(node,))
@@ -208,7 +231,7 @@ def main():
     client_thread.join()
 
     # At this point, both sides are connected
-    print("Established both connections.")
+    write_log("Established both connections.")
 
     # Send Message
     message = Message(node.uuid)
