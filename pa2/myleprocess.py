@@ -1,7 +1,7 @@
 import uuid
 import threading
 import socket
-
+import time
 
 # Message Class
 class Message:
@@ -16,47 +16,46 @@ class Node:
         self.uuid = uuid.uuid4()
         self.flag = 0
         self.leader_id = None
+
+        # IP Information
         self.server_ip = server_ip
         self.server_port = server_port
         self.neighbor_ip = neighbor_ip
         self.neighbor_port = neighbor_port
 
+        # Connection Information
+        self.server_connection = None
+        self.client_socket = None
+
 
 # Server
-def server(server_ip, server_port):
-    # Create TCP
+def server(self, server_ip, server_port):
+    # Create TCP socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_sock:
         # Allows port to be reused instantly
         server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        # Bind neighbor ip and port to socker, then listen
+        # Bind server ip and server port to socker, then listen
         server_sock.bind((server_ip, server_port))
         server_sock.listen(1)
 
-        while True:
-            conn, addr = server_sock.accept()
+        # Print to terminal
+        print(f"Server IP and Port:{self.server_ip}:{self.server_port}")
 
-            with conn:
-                pass
+        # Connect to neighbor and print to terminal
+        self.server_connection, addr = server_sock.accept()
+        print(f"Connected to {addr}")
 
 
 # Client
-def client(uuid):
-    # Open config.txt
-    with open("config.txt", "r") as config:
-        server_ip = config.readline()
-        client_ip = config.readline()
-
-    with open("log.txt", "w") as log:
-        log.writelines(f"UUID: {uuid}")
-
-    # Create the TCP socket
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect((server_ip, client_ip))
-
-    # Create message and send
-    message = Message(uuid)
-    sock.sendall(message.uuid.encode())
+def client(self, neighbor_ip, neighbor_port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_sock:
+        while True:
+            try:
+                client_sock.connect((self.neighbor_ip, self.neighbor_port))
+                break
+            except ConnectionRefusedError:
+                time.sleep(1)
 
 
 # Main Function
