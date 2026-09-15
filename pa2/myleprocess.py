@@ -149,7 +149,7 @@ def receive_message(node: Node) -> None:
 def process_message(node: Node, message: Message) -> bool:
     # Check if leader has not been found yet
     if message.flag == 0:
-        # Received UUID > Process UUID
+        # Received UUID > Process UUID: Forward message
         if message.uuid > node.uuid:
             write_log(
                 f"Received: uuid={message.uuid}, flag={message.flag}, greater, {node.flag}"
@@ -158,7 +158,7 @@ def process_message(node: Node, message: Message) -> bool:
             send_message(node, message)
             return False
 
-        # Received UUID < Process UUID
+        # Received UUID < Process UUID: Ignore message
         elif message.uuid < node.uuid:
             write_log(
                 f"Received: uuid={message.uuid}, flag={message.flag}, less, {node.flag}"
@@ -166,13 +166,13 @@ def process_message(node: Node, message: Message) -> bool:
             write_log("Received message was ignored.")
             return False
 
-        # Received UUID == Process UUID
+        # Received UUID == Process UUID: This process is the leader
         else:
             write_log(
                 f"Received: uuid={message.uuid}, flag={message.flag}, same, {node.flag}"
             )
 
-            # This process is the leader
+            # Update flag and store leader
             node.flag = 1
             node.leader_id = node.uuid
             write_log(f"Leader is decided to {node.leader_id}.")
@@ -183,8 +183,10 @@ def process_message(node: Node, message: Message) -> bool:
 
             return False
 
-    # Leader has been found
+    # Leader has already been found
     else:
+        # Leader Process:
+        # Message has went around the ring, so do not forward message. Only Log.
         if message.uuid == node.uuid:
             write_log(
                 f"Received: uuid={message.uuid}, flag={message.flag}, same, {node.flag}, leader_id={node.leader_id}"
@@ -192,7 +194,8 @@ def process_message(node: Node, message: Message) -> bool:
             write_log(f"Leader is {node.leader_id}")
             return True
 
-        # Process learns leader and forwards
+        # Non-Leader Process:
+        # Update flag and store leader
         node.flag = 1
         node.leader_id = message.uuid
 
@@ -207,6 +210,7 @@ def process_message(node: Node, message: Message) -> bool:
             f"Received: uuid={message.uuid}, flag={message.flag}, {comparison}, {node.flag}, leader_id={node.leader_id}"
         )
 
+        # Forward leader message and terminate
         send_message(node, message)
         write_log(f"Leader is {node.leader_id}")
         return True

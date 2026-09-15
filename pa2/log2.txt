@@ -1,0 +1,11 @@
+UUID: 74a72470-93b5-4284-80c4-5b45c70e0069
+Server is on. IP and Port:127.0.0.1:5002
+Accepted connection from ('127.0.0.1', 65276)
+Connected to neighbor 127.0.0.1:5003
+Established both connections.
+Sent: uuid=74a72470-93b5-4284-80c4-5b45c70e0069, flag=0
+Received: uuid=f3af1551-9d5c-4a2c-b324-40146d12a454, flag=0, greater, 0
+Sent: uuid=f3af1551-9d5c-4a2c-b324-40146d12a454, flag=0
+Received: uuid=f3af1551-9d5c-4a2c-b324-40146d12a454, flag=1, greater, 1, leader_id=f3af1551-9d5c-4a2c-b324-40146d12a454
+Sent: uuid=f3af1551-9d5c-4a2c-b324-40146d12a454, flag=1
+Leader is f3af1551-9d5c-4a2c-b324-40146d12a454

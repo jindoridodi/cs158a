@@ -1,0 +1,15 @@
+UUID: f3af1551-9d5c-4a2c-b324-40146d12a454
+Server is on. IP and Port:127.0.0.1:5001
+Connected to neighbor 127.0.0.1:5002
+Accepted connection from ('127.0.0.1', 51811)
+Established both connections.
+Sent: uuid=f3af1551-9d5c-4a2c-b324-40146d12a454, flag=0
+Received: uuid=3626c64f-fe49-4fe1-9eda-54fe784f568e, flag=0, less, 0
+Received message was ignored.
+Received: uuid=74a72470-93b5-4284-80c4-5b45c70e0069, flag=0, less, 0
+Received message was ignored.
+Received: uuid=f3af1551-9d5c-4a2c-b324-40146d12a454, flag=0, same, 0
+Leader is decided to f3af1551-9d5c-4a2c-b324-40146d12a454.
+Sent: uuid=f3af1551-9d5c-4a2c-b324-40146d12a454, flag=1
+Received: uuid=f3af1551-9d5c-4a2c-b324-40146d12a454, flag=1, same, 1, leader_id=f3af1551-9d5c-4a2c-b324-40146d12a454
+Leader is f3af1551-9d5c-4a2c-b324-40146d12a454
