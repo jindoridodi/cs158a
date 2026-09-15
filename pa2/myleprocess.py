@@ -136,8 +136,6 @@ def receive_message(node: Node) -> None:
             # Convert JSON str to Message
             message = convert_to_message(msg_data)
 
-            write_log(f"Received: uuid={message.uuid}, flag={message.flag}")
-
             # Process recieved message
             leader_found = process_message(node, message)
 
@@ -153,7 +151,9 @@ def process_message(node: Node, message: Message) -> bool:
     if message.flag == 0:
         # Received UUID > Process UUID
         if message.uuid > node.uuid:
-            write_log(f"Message's UUID is greater than Process's UUID")
+            write_log(
+                f"Received: uuid={message.uuid}, flag={message.flag}, greater, {node.flag}"
+            )
             # Forward message
             send_message(node, message)
             return False
@@ -161,35 +161,52 @@ def process_message(node: Node, message: Message) -> bool:
         # Received UUID < Process UUID
         elif message.uuid < node.uuid:
             write_log(
-                f"Received message is ignored. Message's UUID is less than Process's UUID"
+                f"Received: uuid={message.uuid}, flag={message.flag}, less, {node.flag}"
             )
+            write_log("Received message was ignored.")
             return False
 
         # Received UUID == Process UUID
         else:
-            write_log(f"Message's UUID is equal to Process's UUID")
+            write_log(
+                f"Received: uuid={message.uuid}, flag={message.flag}, same, {node.flag}"
+            )
 
             # This process is the leader
             node.flag = 1
             node.leader_id = node.uuid
+            write_log(f"Leader is decided to {node.leader_id}.")
 
             # Tell other nodes the leader's UUID
             leader_msg = Message(node.leader_id, 1)
             send_message(node, leader_msg)
 
-            write_log(f"Leader found: {message.uuid}")
             return False
 
     # Leader has been found
     else:
         if message.uuid == node.uuid:
-            write_log(f"Leader: {node.leader_id}")
+            write_log(
+                f"Received: uuid={message.uuid}, flag={message.flag}, same, {node.flag}, leader_id={node.leader_id}"
+            )
+            write_log(f"Leader is {node.leader_id}")
             return True
 
         # Process learns leader and forwards
         node.flag = 1
         node.leader_id = message.uuid
-        write_log(f"Leader: {node.leader_id}")
+
+        # Compare UUID and log
+        if message.uuid > node.uuid:
+            comparison = "greater"
+        elif message.uuid < node.uuid:
+            comparison = "less"
+        else:
+            comparison = "same"
+        write_log(
+            f"Received: uuid={message.uuid}, flag={message.flag}, {comparison}, {node.flag}, leader_id={node.leader_id}"
+        )
+
         send_message(node, message)
         return True
 
@@ -214,9 +231,9 @@ def main():
     node = Node(server_ip, server_port, neighbor_ip, neighbor_port)
 
     # Log and print to terminal
-    with open("log.txt", "w") as log:
-        log.write(f"UUID: {node.uuid}\n")
-    write_log(f"UUID: {node.uuid}\n")
+    with open("log.txt", "w") as log_file:
+        log_file.write(f"UUID: {node.uuid}\n")
+    print(f"UUID: {node.uuid}")
 
     # Create threads
     server_thread = threading.Thread(target=server, args=(node,))
