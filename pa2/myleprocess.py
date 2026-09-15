@@ -47,7 +47,7 @@ def client(uuid):
         server_ip = config.readline()
         client_ip = config.readline()
 
-    with open("logs.txt", "w") as log:
+    with open("log.txt", "w") as log:
         log.writelines(f"UUID: {uuid}")
 
     # Create the TCP socket
@@ -62,16 +62,26 @@ def client(uuid):
 # Main Function
 def main():
     with open("config.txt", "r") as config:
-        server_ip_and_port = config.readline()
-        client_ip_and_port = config.readline()
+        server_ip_and_port = config.readline().strip()
+        neighbor_ip_and_port = config.readline().strip()
 
-    # Parse
-    server_ip = server_ip_and_port.split(",")[0]
-    server_port = server_ip_and_port.split(",")[1]
+    # Parse server ip and port
+    server_ip, server_port = server_ip_and_port.split(",")
+
+    # Parse neighbor ip and port
+    neighbor_ip, neighbor_port = neighbor_ip_and_port.split(",")
+
+    # Make node
+    node = Node(server_ip, server_port, neighbor_ip, neighbor_port)
+
+    # Log and print to terminal
+    with open("log.txt", "w") as log:
+        log.write(f"UUID: {node.uuid}\n")
+    print(f"UUID: {node.uuid}\n")
 
     # Start threads
-    server_thread = threading.Thread(server(server_ip, server_port))
-    client_thread = threading.Thread(client(uuid))
+    server_thread = threading.Thread(target=server, args=(node,))
+    client_thread = threading.Thread(target=client, args=(node,))
 
 
 if __name__ == "__main__":
