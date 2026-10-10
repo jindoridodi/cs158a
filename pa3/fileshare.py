@@ -1,6 +1,8 @@
 import socket
 import threading
 import time
+import json
+import struct
 
 
 # Node Class
@@ -42,8 +44,15 @@ def UDP_Broadcast():
         pass
 
 
-def send_message():
-    pass
+def send_message(connection: socket.socket, message: dict) -> None:
+    # Convert JSON to UTF-8
+    data_payload = json.dumps(message).encode("utf-8")
+
+    # Make header to know where TCP message ends
+    header = struct.pack("!I", len(data_payload))
+
+    # Send message
+    connection.sendall(data_payload + header)
 
 
 def receive_message():
