@@ -1,5 +1,6 @@
 import socket
 import threading
+import time
 
 
 # Node Class
@@ -19,26 +20,20 @@ class Node:
 # Peer Class
 class Peer:
     def __init__(self, peer_ip: str, peer_port: int, connection: socket.socket):
-      self.peer_ip: str = peer_ip
-      self.peer_port: int = peer_port
-      self.connection: socket.socket  = connection
-
-
-# Message Class
-class Message:
-    def __init__(self, message_type, data):
-        self.message_type: str = message_type
-        self.data: dict = data
+        self.peer_ip: str = peer_ip
+        self.peer_port: int = peer_port
+        self.connection: socket.socket = connection
 
 
 # Helper function for logs
 def write_log(log: str) -> None:
-    # Print log to terminal
-    print(log)
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    entry = f"[{timestamp}] {log}"
 
-    # Write log to txt
-    with open("log.txt", "a") as log_file:
-        log_file.write(log + "\n")
+    print(entry)
+
+    with open("log.txt", "a", encoding="utf-8") as log_file:
+        log_file.write(entry + "\n")
 
 
 def UDP_Broadcast():
@@ -64,7 +59,7 @@ def main():
     UDP_Thread = threading.Thread(target=UDP_Broadcast)
 
     # Create Thread for TCP
-    
+
     # Start Threads
 
     pass
