@@ -55,7 +55,15 @@ def send_message(connection: socket.socket, message: dict) -> None:
     connection.sendall(data_payload + header)
 
 
-def receive_message():
+def receive_message(connection: socket.socket) -> dict | None:
+    # Read 4 header bytes
+    
+    # Convert to int
+    
+    # Read
+    
+    # Convert to dict
+    
     pass
 
 
