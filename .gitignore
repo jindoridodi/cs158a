@@ -16,6 +16,9 @@ build/
 develop-eggs/
 dist/
 downloads/
+!pa3/downloads/
+pa3/downloads/*
+!pa3/downloads/.gitkeep
 eggs/
 .eggs/
 lib/
