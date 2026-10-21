@@ -108,12 +108,40 @@ def make_file_data(node_id: str, filename: str, data: bytes | None) -> dict:
 
 def encode_udp(message: dict) -> bytes:
     """Encode one message as a UTF-8 JSON UDP datagram."""
-    raise NotImplementedError("TODO: Person 2")
+    # Convert the message dictionary to compact JSON
+    data_payload = json.dumps(message, separators=(",", ":"))
+
+    # Convert the JSON text to bytes for the UDP socket
+    return data_payload.encode("utf-8")
 
 
 def decode_udp(data: bytes) -> dict | None:
     """Decode UTF-8 JSON, or return None for invalid data or missing keys."""
-    raise NotImplementedError("TODO: Person 2")
+    try:
+        # Convert the UDP bytes to a JSON value
+        message = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+    # Require every discovery message to identify its type and sender
+    if not isinstance(message, dict):
+        return None
+    if message.get("type") not in {"PEER_REQUEST", "PEER_ACK"}:
+        return None
+    if not isinstance(message.get("node_id"), str):
+        return None
+
+    # Require an ACK to advertise a valid TCP port
+    if message["type"] == "PEER_ACK":
+        tcp_port = message.get("tcp_port")
+        if (
+            not isinstance(tcp_port, int)
+            or isinstance(tcp_port, bool)
+            or not 1 <= tcp_port <= 65535
+        ):
+            return None
+
+    return message
 
 
 def send_message(peer, message: dict) -> None:
