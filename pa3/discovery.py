@@ -1,5 +1,3 @@
-"""Person 1: discover peers over UDP and establish their TCP connections."""
-
 from __future__ import annotations
 
 import socket

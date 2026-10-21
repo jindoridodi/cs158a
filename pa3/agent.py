@@ -1,5 +1,3 @@
-"""Person 3: peer-to-peer agent state, transfers, commands, and entry point."""
-
 from __future__ import annotations
 
 import argparse
