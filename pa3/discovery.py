@@ -248,8 +248,9 @@ def udp_listener(node) -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        if hasattr(socket, "SO_REUSEPORT"):
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        reuse_port = getattr(socket, "SO_REUSEPORT", None)
+        if reuse_port is not None:
+            sock.setsockopt(socket.SOL_SOCKET, reuse_port, 1)
         sock.bind(("", protocol.UDP_PORT))
         while True:
             try:
