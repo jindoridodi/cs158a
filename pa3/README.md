@@ -57,6 +57,8 @@ The following excerpts are from a five-node run on one machine using TCP ports
 6101–6105. Each node started with its own `nodeN.txt` in `shared/`. Node IDs,
 addresses, and timestamps change on each run.
 
+<img src="readmeassets/image.png" alt="Five-node demo" width="600">
+
 Node 1 discovered all four other nodes and received their file lists:
 
 ```text
