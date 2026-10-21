@@ -34,8 +34,8 @@ def log_message(direction: str, addr: tuple[str, int], msg_type: str) -> None:
     # Separate the peer's IP address and port
     ip, port = addr
 
-    # Write the message direction, peer, and type to the log
-    write_log(f"{direction} peer={ip}:{port} type={msg_type}")
+    # Write the direction, peer address, and message type to the log
+    write_log(f"{direction} {ip}:{port} {msg_type}")
 
 
 def log_peer_change(event: str, node_id: str, addr: tuple[str, int]) -> None:
@@ -43,8 +43,8 @@ def log_peer_change(event: str, node_id: str, addr: tuple[str, int]) -> None:
     # Separate the peer's IP address and port
     ip, port = addr
 
-    # Write the peer table change to the log
-    write_log(f"PEER {event} node_id={node_id} addr={ip}:{port}")
+    # Write the event, node ID, and peer address to the log
+    write_log(f"{event} {node_id} {ip}:{port}")
 
 
 def make_peer_request(node_id: str) -> dict:
@@ -145,41 +145,66 @@ def decode_udp(data: bytes) -> dict | None:
     return message
 
 
-def send_message(peer, message: dict) -> None:
-    """Send a framed and logged message through a peer's locked socket."""
+def recv_exact(conn: socket.socket, n: int) -> bytes | None:
+    """Read exactly n bytes, or return None if the peer closes the socket."""
+    data = b""
+
+    # Keep reading because one recv may return only part of the data
+    while len(data) < n:
+        chunk = conn.recv(n - len(data))
+        if not chunk:
+            return None
+        data += chunk
+
+    return data
+
+
+def send_on_socket(
+    conn: socket.socket,
+    lock: threading.Lock,
+    addr: tuple[str, int],
+    message: dict,
+) -> None:
+    """Lock, send a four-byte big-endian length and JSON, then log it."""
     # Convert JSON to UTF-8
     data_payload = json.dumps(message).encode("utf-8")
 
     # Make header to know where TCP message ends
     header = struct.pack("!I", len(data_payload))
 
-    # Send message
-    with peer.send_lock:
-        peer.connection.sendall(header + data_payload)
-    log_message("SENT", (peer.ip, peer.tcp_port), message["type"])
+    # Lock the socket so messages from different threads do not overlap
+    with lock:
+        conn.sendall(header + data_payload)
+
+    # Log the message after it is sent successfully
+    log_message("SENT", addr, message["type"])
+
+
+def send_message(peer, message: dict) -> None:
+    """Send a message using the peer's socket, send lock, and address."""
+    send_on_socket(
+        peer.connection,
+        peer.send_lock,
+        (peer.ip, peer.tcp_port),
+        message,
+    )
 
 
 def receive_message(conn: socket.socket, addr: tuple[str, int]) -> dict | None:
     """Read exact framing and JSON; log it or return None on disconnect."""
     try:
         # Read the complete 4-byte header
-        header = b""
-        while len(header) < HEADER_SIZE:
-            data = conn.recv(HEADER_SIZE - len(header))
-            if not data:
-                return None
-            header += data
+        header = recv_exact(conn, HEADER_SIZE)
+        if header is None:
+            return None
 
         # Convert the header to the payload size
         payload_size = struct.unpack("!I", header)[0]
 
         # Read the complete JSON payload
-        data_payload = b""
-        while len(data_payload) < payload_size:
-            data = conn.recv(payload_size - len(data_payload))
-            if not data:
-                return None
-            data_payload += data
+        data_payload = recv_exact(conn, payload_size)
+        if data_payload is None:
+            return None
 
         # Convert the UTF-8 JSON payload to a dictionary
         message = json.loads(data_payload.decode("utf-8"))
@@ -233,10 +258,7 @@ def peer_loop(node, peer) -> None:
                 status = message.get("status")
                 valid_content = (
                     status == "NOT_FOUND" and message.get("content") is None
-                ) or (
-                    status == "OK"
-                    and isinstance(message.get("content"), str)
-                )
+                ) or (status == "OK" and isinstance(message.get("content"), str))
                 if isinstance(message.get("filename"), str) and valid_content:
                     node.handle_file_data(peer, message)
 
