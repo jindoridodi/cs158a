@@ -127,7 +127,7 @@ class Node:
 
         downloads_path = self.downloads_dir / filename
         shared_path = self.shared_dir / filename
-        staged_path = self.shared_dir / f".{filename}.{uuid.uuid4().hex}.part"
+        staged_path = self.downloads_dir / f".{filename}.{uuid.uuid4().hex}.part"
         try:
             # Two peers can answer requests for the same name concurrently.
             # Serialize the complete downloads/ and shared/ update so their
