@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import socket
 import threading
 import time
@@ -48,27 +49,61 @@ def log_peer_change(event: str, node_id: str, addr: tuple[str, int]) -> None:
 
 def make_peer_request(node_id: str) -> dict:
     """Build a PEER_REQUEST message containing the sender's node ID."""
-    raise NotImplementedError("TODO: Person 2")
+    # Identify the broadcast and the node that sent it
+    return {
+        "type": "PEER_REQUEST",
+        "node_id": node_id,
+    }
 
 
 def make_peer_ack(node_id: str, tcp_port: int) -> dict:
     """Build a PEER_ACK message advertising the sender's TCP port."""
-    raise NotImplementedError("TODO: Person 2")
+    # Identify the response and advertise the node's TCP port
+    return {
+        "type": "PEER_ACK",
+        "node_id": node_id,
+        "tcp_port": tcp_port,
+    }
 
 
 def make_file_list(node_id: str, files: list[str]) -> dict:
     """Build a FILE_LIST message with the sender's shared filenames."""
-    raise NotImplementedError("TODO: Person 2")
+    # Copy the filenames so later list changes do not change the message
+    return {
+        "type": "FILE_LIST",
+        "node_id": node_id,
+        "files": list(files),
+    }
 
 
 def make_data_request(node_id: str, filename: str) -> dict:
     """Build a DATA_REQUEST message for one filename."""
-    raise NotImplementedError("TODO: Person 2")
+    # Identify the request and the desired filename
+    return {
+        "type": "DATA_REQUEST",
+        "node_id": node_id,
+        "filename": filename,
+    }
 
 
 def make_file_data(node_id: str, filename: str, data: bytes | None) -> dict:
     """Build FILE_DATA with base64 content or a NOT_FOUND response for None."""
-    raise NotImplementedError("TODO: Person 2")
+    # Create the fields shared by successful and failed responses
+    message = {
+        "type": "FILE_DATA",
+        "node_id": node_id,
+        "filename": filename,
+    }
+
+    # Report a file that no longer exists
+    if data is None:
+        message["status"] = "NOT_FOUND"
+        return message
+
+    # Encode the file bytes as text so they can be placed inside JSON
+    message["status"] = "OK"
+    message["data"] = base64.b64encode(data).decode("ascii")
+    return message
 
 
 def encode_udp(message: dict) -> bytes:
