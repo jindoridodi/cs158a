@@ -194,4 +194,54 @@ def receive_message(conn: socket.socket, addr: tuple[str, int]) -> dict | None:
 
 def peer_loop(node, peer) -> None:
     """Dispatch peer messages, then remove the peer and close its socket."""
-    raise NotImplementedError("TODO: Person 2")
+    addr = (peer.ip, peer.tcp_port)
+
+    try:
+        while True:
+            # Wait for the peer's next complete TCP message
+            message = receive_message(peer.connection, addr)
+            if message is None:
+                break
+
+            # Ignore messages that claim to come from a different peer
+            if message.get("node_id") != peer.node_id:
+                write_log(f"Ignored message with wrong node_id from {peer.ip}")
+                continue
+
+            message_type = message["type"]
+
+            # Replace the peer's advertised file list
+            if message_type == "FILE_LIST":
+                files = message.get("files")
+                if isinstance(files, list) and all(
+                    isinstance(filename, str) for filename in files
+                ):
+                    node.peers.set_files(peer.node_id, files)
+
+            # Ask the node to serve the requested file
+            elif message_type == "DATA_REQUEST":
+                if isinstance(message.get("filename"), str):
+                    node.handle_data_request(peer, message)
+
+            # Ask the node to process the returned file or error
+            elif message_type == "FILE_DATA":
+                status = message.get("status")
+                valid_data = status == "NOT_FOUND" or (
+                    status == "OK" and isinstance(message.get("data"), str)
+                )
+                if isinstance(message.get("filename"), str) and valid_data:
+                    node.handle_file_data(peer, message)
+
+            # Ignore message types that are not used over TCP
+            else:
+                write_log(
+                    f"Ignored unsupported message type {message_type} "
+                    f"from {peer.ip}:{peer.tcp_port}"
+                )
+    finally:
+        # Remove only this connection from the peer table
+        if node.peers.remove(peer.node_id, peer.connection):
+            log_peer_change("REMOVED", peer.node_id, addr)
+
+        # Close the disconnected peer's socket
+        peer.connection.close()
