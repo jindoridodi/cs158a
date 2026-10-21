@@ -89,7 +89,7 @@ def make_data_request(node_id: str, filename: str) -> dict:
 def make_file_data(node_id: str, filename: str, data: bytes | None) -> dict:
     """Build FILE_DATA with base64 content or a NOT_FOUND response for None."""
     # Create the fields shared by successful and failed responses
-    message = {
+    message: dict[str, object] = {
         "type": "FILE_DATA",
         "node_id": node_id,
         "filename": filename,
@@ -98,11 +98,12 @@ def make_file_data(node_id: str, filename: str, data: bytes | None) -> dict:
     # Report a file that no longer exists
     if data is None:
         message["status"] = "NOT_FOUND"
+        message["content"] = None
         return message
 
     # Encode the file bytes as text so they can be placed inside JSON
     message["status"] = "OK"
-    message["data"] = base64.b64encode(data).decode("ascii")
+    message["content"] = base64.b64encode(data).decode("ascii")
     return message
 
 
@@ -182,7 +183,11 @@ def receive_message(conn: socket.socket, addr: tuple[str, int]) -> dict | None:
 
         # Convert the UTF-8 JSON payload to a dictionary
         message = json.loads(data_payload.decode("utf-8"))
-        if not isinstance(message, dict) or "type" not in message:
+        if not isinstance(message, dict):
+            return None
+        if not isinstance(message.get("type"), str):
+            return None
+        if not isinstance(message.get("node_id"), str):
             return None
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, struct.error):
         return None
@@ -226,10 +231,13 @@ def peer_loop(node, peer) -> None:
             # Ask the node to process the returned file or error
             elif message_type == "FILE_DATA":
                 status = message.get("status")
-                valid_data = status == "NOT_FOUND" or (
-                    status == "OK" and isinstance(message.get("data"), str)
+                valid_content = (
+                    status == "NOT_FOUND" and message.get("content") is None
+                ) or (
+                    status == "OK"
+                    and isinstance(message.get("content"), str)
                 )
-                if isinstance(message.get("filename"), str) and valid_data:
+                if isinstance(message.get("filename"), str) and valid_content:
                     node.handle_file_data(peer, message)
 
             # Ignore message types that are not used over TCP
