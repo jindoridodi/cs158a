@@ -70,18 +70,8 @@ def decode_udp(data: bytes) -> dict | None:
     raise NotImplementedError("TODO: Person 2")
 
 
-def recv_exact(conn: socket.socket, n: int) -> bytes | None:
-    """Read exactly n bytes, or return None if the peer closes the socket."""
-    raise NotImplementedError("TODO: Person 2")
-
-
-def send_on_socket(
-    conn: socket.socket,
-    lock: threading.Lock,
-    addr: tuple[str, int],
-    message: dict,
-) -> None:
-    """Lock, send a four-byte big-endian length and JSON, then log it."""
+def send_message(peer, message: dict) -> None:
+    """Send a framed and logged message through a peer's locked socket."""
     # Convert JSON to UTF-8
     data_payload = json.dumps(message).encode("utf-8")
 
@@ -89,16 +79,13 @@ def send_on_socket(
     header = struct.pack("!I", len(data_payload))
 
     # Send message
-    conn.sendall(data_payload + header)
-
-
-def send_message(peer, message: dict) -> None:
-    """Send a message using the peer's socket, send lock, and address."""
-    raise NotImplementedError("TODO: Person 2")
+    with peer.send_lock:
+        peer.connection.sendall(header + data_payload)
+    log_message("SENT", (peer.ip, peer.tcp_port), message["type"])
 
 
 def receive_message(conn: socket.socket, addr: tuple[str, int]) -> dict | None:
-    """Read and log framed JSON; return None on errors or disconnect."""
+    """Read exact framing and JSON; log it or return None on disconnect."""
     raise NotImplementedError("TODO: Person 2")
 
 
