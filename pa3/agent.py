@@ -45,7 +45,7 @@ class Node:
     @staticmethod
     def _safe_filename(value: object) -> str | None:
         """Accept one basename only; never allow a peer to select a path."""
-        if not isinstance(value, str) or not value or value in (".", ".."):
+        if not isinstance(value, str) or not value or ".." in value:
             return None
         if "\x00" in value or Path(value).name != value or "/" in value or "\\" in value:
             return None
@@ -69,27 +69,36 @@ class Node:
             response = protocol.make_file_data(self.node_id, response_name, content)
             protocol.send_message(peer, response)
         except OSError as exc:
-            protocol.write_log(f"Could not serve {response_name} to {peer.node_id}: {exc}")
+            protocol.write_log(
+                f"Could not serve {response_name} to {peer.node_id[:8]}: {exc}"
+            )
 
     def handle_file_data(self, peer, msg: dict) -> None:
         """Report missing files; save OK data before sharing a copy."""
         filename = self._safe_filename(msg.get("filename"))
         if filename is None:
-            protocol.write_log(f"Rejected unsafe filename from {peer.node_id}")
+            protocol.write_log(f"DOWNLOAD rejected unsafe filename from {peer.node_id[:8]}")
             return
 
         status = msg.get("status")
         if status == "NOT_FOUND":
-            print(f"{peer.node_id} no longer has {filename}.")
+            detail = f"DOWNLOAD {filename} from {peer.node_id[:8]}: NOT_FOUND"
+            protocol.write_log(detail)
+            print(f"{peer.node_id[:8]} no longer has {filename}.")
             return
         if status != "OK" or not isinstance(msg.get("content"), str):
-            print(f"Invalid file response for {filename} from {peer.node_id}.")
+            detail = f"DOWNLOAD {filename} from {peer.node_id[:8]}: invalid response"
+            protocol.write_log(detail)
+            print(f"Invalid file response for {filename} from {peer.node_id[:8]}.")
             return
 
         try:
             data = base64.b64decode(msg["content"], validate=True)
         except (ValueError, binascii.Error):
-            print(f"Invalid base64 data for {filename} from {peer.node_id}.")
+            protocol.write_log(
+                f"DOWNLOAD {filename} from {peer.node_id[:8]}: invalid base64 data"
+            )
+            print(f"Invalid base64 data for {filename} from {peer.node_id[:8]}.")
             return
 
         downloads_path = self.downloads_dir / filename
@@ -101,18 +110,28 @@ class Node:
             downloads_path.write_bytes(data)
             with self._files_lock:
                 if shared_path.exists():
+                    protocol.write_log(
+                        f"DOWNLOAD {filename} from {peer.node_id[:8]}: skipped, already shared"
+                    )
                     print(f"Already have {filename} in shared/; keeping that copy.")
                     return
-                shutil.copyfile(downloads_path, staged_path)
+                shutil.copy2(downloads_path, staged_path)
                 try:
                     # Hard-linking is atomic and fails rather than replacing a
                     # file that appeared in shared/ while the copy was staged.
                     os.link(staged_path, shared_path)
                 except FileExistsError:
+                    protocol.write_log(
+                        f"DOWNLOAD {filename} from {peer.node_id[:8]}: skipped, already shared"
+                    )
                     print(f"Already have {filename} in shared/; keeping that copy.")
                     return
-            print(f"Downloaded {filename} from {peer.node_id}.")
+            protocol.write_log(f"DOWNLOAD {filename} from {peer.node_id[:8]}: complete")
+            print(f"Downloaded {filename} from {peer.node_id[:8]}.")
         except OSError as exc:
+            protocol.write_log(
+                f"DOWNLOAD {filename} from {peer.node_id[:8]}: failed to save: {exc}"
+            )
             print(f"Could not save {filename}: {exc}")
         finally:
             try:
@@ -136,18 +155,15 @@ class Node:
 
         peer = self.peers.get(node_id)
         if peer is None:
-            print(f"No connected peer matches '{node_id}'.")
-            return
-        if safe_name not in peer.files:
-            print(f"{peer.node_id} is not advertising {safe_name}.")
+            print(f"No connected peer matches '{node_id[:8]}'.")
             return
 
         try:
             request = protocol.make_data_request(self.node_id, safe_name)
             protocol.send_message(peer, request)
-            print(f"Requested {safe_name} from {peer.node_id}.")
+            print(f"Requested {safe_name} from {peer.node_id[:8]}.")
         except OSError as exc:
-            print(f"Could not request {safe_name} from {peer.node_id}: {exc}")
+            print(f"Could not request {safe_name} from {peer.node_id[:8]}: {exc}")
 
     def file_list_loop(self) -> None:
         """Advertise shared files every ten seconds, skipping socket errors."""
@@ -158,7 +174,7 @@ class Node:
                     protocol.send_message(peer, message)
                 except OSError as exc:
                     protocol.write_log(
-                        f"Could not send FILE_LIST to {peer.node_id}: {exc}"
+                        f"Could not send FILE_LIST to {peer.node_id[:8]}: {exc}"
                     )
 
     def _peer_matches(self, prefix: str):
@@ -169,7 +185,11 @@ class Node:
         if not matches:
             print(f"No connected peer matches '{prefix}'.")
         else:
-            print(f"Peer ID prefix '{prefix}' is ambiguous; use more characters.")
+            ids = ", ".join(peer.node_id[:8] for peer in matches)
+            print(
+                f"Peer ID prefix '{prefix}' is ambiguous ({ids}); "
+                "use more characters."
+            )
         return None
 
     def _print_peers(self) -> None:
@@ -178,7 +198,7 @@ class Node:
             print("No connected peers.")
             return
         for peer in peers:
-            print(f"{peer.node_id}\t{peer.ip}:{peer.tcp_port}")
+            print(f"{peer.node_id[:8]}\t{peer.ip}:{peer.tcp_port}")
 
     def _print_files(self) -> None:
         peers = self.peers.all()
@@ -186,7 +206,7 @@ class Node:
             print("No connected peers.")
             return
         for peer in peers:
-            print(f"{peer.node_id} ({peer.ip}:{peer.tcp_port}):")
+            print(f"{peer.node_id[:8]} ({peer.ip}:{peer.tcp_port}):")
             if peer.files:
                 for filename in sorted(peer.files):
                     print(f"  {filename}")
