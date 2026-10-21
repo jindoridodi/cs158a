@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import socket
 import threading
-
+import time
+import json
+import struct
 
 UDP_PORT = 54321
 HEADER_SIZE = 4
@@ -14,7 +16,13 @@ _log_lock = threading.Lock()
 
 def write_log(text: str) -> None:
     """Print and append a timestamped line to LOG_FILE under _log_lock."""
-    raise NotImplementedError("TODO: Person 2")
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    entry = f"[{timestamp}] {text}"
+
+    print(entry)
+
+    with open(LOG_FILE, "a", encoding="utf-8") as log_file:
+        log_file.write(entry + "\n")
 
 
 def log_message(direction: str, addr: tuple[str, int], msg_type: str) -> None:
@@ -74,7 +82,14 @@ def send_on_socket(
     message: dict,
 ) -> None:
     """Lock, send a four-byte big-endian length and JSON, then log it."""
-    raise NotImplementedError("TODO: Person 2")
+    # Convert JSON to UTF-8
+    data_payload = json.dumps(message).encode("utf-8")
+
+    # Make header to know where TCP message ends
+    header = struct.pack("!I", len(data_payload))
+
+    # Send message
+    conn.sendall(data_payload + header)
 
 
 def send_message(peer, message: dict) -> None:
