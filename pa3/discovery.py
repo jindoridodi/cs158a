@@ -167,7 +167,7 @@ def accept_loop(node) -> None:
 
 
 def handle_incoming(node, conn, addr) -> None:
-    """Read the client's FILE_LIST and enter its receive loop."""
+    """Validate the client's FILE_LIST before adding it to the peer table."""
     try:
         conn.settimeout(10)
         msg = protocol.receive_message(conn, addr)
@@ -176,19 +176,25 @@ def handle_incoming(node, conn, addr) -> None:
         conn.close()
         return
 
+    peer_id = msg.get("node_id") if msg is not None else None
+    files = msg.get("files") if msg is not None else None
     if (
         msg is None
         or msg.get("type") != "FILE_LIST"
-        or msg.get("node_id") == node.node_id
+        or not isinstance(peer_id, str)
+        or not peer_id
+        or peer_id == node.node_id
+        or not isinstance(files, list)
+        or not all(isinstance(filename, str) for filename in files)
     ):
         conn.close()
         return
 
-    peer = Peer(msg["node_id"], addr[0], addr[1], conn)
+    peer = Peer(peer_id, addr[0], addr[1], conn)
     if not _register_peer(node, peer, i_am_client=False):
         return
 
-    node.peers.set_files(peer.node_id, msg["files"])
+    node.peers.set_files(peer.node_id, files)
     try:
         protocol.send_message(
             peer,
