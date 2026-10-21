@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
+from contextlib import contextmanager
 import os
 import shutil
 import threading
@@ -30,6 +31,29 @@ class Node:
         self.downloads_dir.mkdir(parents=True, exist_ok=True)
         self._stop_event = threading.Event()
         self._files_lock = threading.Lock()
+        self._download_locks_guard = threading.Lock()
+        self._download_locks: dict[str, tuple[threading.Lock, int]] = {}
+
+    @contextmanager
+    def _download_name_lock(self, filename: str):
+        """Serialize writes for one filename without blocking other transfers."""
+        with self._download_locks_guard:
+            lock, users = self._download_locks.get(
+                filename, (threading.Lock(), 0)
+            )
+            self._download_locks[filename] = (lock, users + 1)
+
+        lock.acquire()
+        try:
+            yield
+        finally:
+            lock.release()
+            with self._download_locks_guard:
+                lock, users = self._download_locks[filename]
+                if users == 1:
+                    del self._download_locks[filename]
+                else:
+                    self._download_locks[filename] = (lock, users - 1)
 
     def shared_files(self) -> list[str]:
         """Return sorted regular filenames directly inside shared_dir."""
@@ -105,27 +129,29 @@ class Node:
         shared_path = self.shared_dir / filename
         staged_path = self.shared_dir / f".{filename}.{uuid.uuid4().hex}.part"
         try:
-            # Write the complete transfer outside shared/ first. Stage the
-            # second copy in shared/ and publish it atomically when complete.
-            downloads_path.write_bytes(data)
-            with self._files_lock:
-                if shared_path.exists():
-                    protocol.write_log(
-                        f"DOWNLOAD {filename} from {peer.node_id[:8]}: skipped, already shared"
-                    )
-                    print(f"Already have {filename} in shared/; keeping that copy.")
-                    return
-                shutil.copy2(downloads_path, staged_path)
-                try:
-                    # Hard-linking is atomic and fails rather than replacing a
-                    # file that appeared in shared/ while the copy was staged.
-                    os.link(staged_path, shared_path)
-                except FileExistsError:
-                    protocol.write_log(
-                        f"DOWNLOAD {filename} from {peer.node_id[:8]}: skipped, already shared"
-                    )
-                    print(f"Already have {filename} in shared/; keeping that copy.")
-                    return
+            # Two peers can answer requests for the same name concurrently.
+            # Serialize the complete downloads/ and shared/ update so their
+            # bytes cannot overwrite each other midway through a write.
+            with self._download_name_lock(filename):
+                with self._files_lock:
+                    if shared_path.exists():
+                        protocol.write_log(
+                            f"DOWNLOAD {filename} from {peer.node_id[:8]}: skipped, already shared"
+                        )
+                        print(f"Already have {filename} in shared/; keeping that copy.")
+                        return
+                    # Write the complete transfer outside shared/ first.
+                    downloads_path.write_bytes(data)
+                    # Stage the copy in shared/, then atomically publish it.
+                    shutil.copy2(downloads_path, staged_path)
+                    try:
+                        os.link(staged_path, shared_path)
+                    except FileExistsError:
+                        protocol.write_log(
+                            f"DOWNLOAD {filename} from {peer.node_id[:8]}: skipped, already shared"
+                        )
+                        print(f"Already have {filename} in shared/; keeping that copy.")
+                        return
             protocol.write_log(f"DOWNLOAD {filename} from {peer.node_id[:8]}: complete")
             print(f"Downloaded {filename} from {peer.node_id[:8]}.")
         except OSError as exc:
@@ -156,6 +182,9 @@ class Node:
         peer = self.peers.get(node_id)
         if peer is None:
             print(f"No connected peer matches '{node_id[:8]}'.")
+            return
+        if safe_name not in peer.files:
+            print(f"{peer.node_id[:8]} is not advertising {safe_name}.")
             return
 
         try:

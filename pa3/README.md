@@ -8,7 +8,12 @@ From `pa3/`, run each node with a different TCP port:
 python agent.py --port 6001
 ```
 
-Commands: `peers`, `files`, `get <node_id_prefix> <filename>`, and `quit`.
+Commands:
+
+- `peers`: Show all connected peers.
+- `files`: Show the files advertised by each peer.
+- `get <node_id_prefix> <filename>`: Request a file from a peer.
+- `quit`: Close the node and exit.
 
 ## Message format
 
